@@ -1,0 +1,19 @@
+html {
+    display: flex;
+    height: 100%;
+    justify-content: center;
+}
+
+body {
+    margin: 10px;
+    overflow: hidden;
+    background: rebeccapurple;
+    color: hotpink;
+}
+
+.board {
+    border: solid 1px;
+    box-sizing: border-box;
+    /*width: calc(100vw - 20px);*/
+    /*height: literal("calc(1/(480/320) * calc(100vw - 20px))");*/
+}

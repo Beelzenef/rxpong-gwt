@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE module PUBLIC "-//Google Inc.//DTD Google Web Toolkit 2.8.1//EN" "http://gwtproject.org/doctype/2.8.1/gwt-module.dtd">
+<module rename-to="pong">
+    <inherits name="com.google.gwt.core.Core"/>
+    <inherits name="com.google.gwt.resources.Resources"/>
+    <inherits name="com.google.gwt.safehtml.SafeHtml"/>
+    <inherits name="com.google.web.bindery.event.Event"/>
+    <inherits name="com.intendia.rxgwt2.RxElemento"/>
+    <inherits name="org.jboss.gwt.elemento.Core"/>
+
+    <entry-point class="pong.client.Pong"/>
+    <set-configuration-property name="CssResource.enableGss" value="true"/>
+    <collapse-all-properties/>
+    <public path="public"/>
+</module>
