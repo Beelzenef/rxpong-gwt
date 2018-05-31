@@ -12,7 +12,7 @@ body {
 }
 
 .board {
-    border: solid 1px;
+    border: orange solid 1px;
     box-sizing: border-box;
     /*width: calc(100vw - 20px);*/
     /*height: literal("calc(1/(480/320) * calc(100vw - 20px))");*/
