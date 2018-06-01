@@ -1,6 +1,5 @@
 package pong.client;
 
-import static elemental2.dom.DomGlobal.console;
 import static elemental2.dom.DomGlobal.document;
 import static io.reactivex.Observable.empty;
 import static io.reactivex.Observable.just;
@@ -24,10 +23,12 @@ import elemental2.dom.Event;
 import elemental2.dom.EventListener;
 import elemental2.dom.EventTarget;
 import elemental2.dom.HTMLCanvasElement;
+import elemental2.dom.HTMLParagraphElement;
 import elemental2.dom.KeyboardEvent;
 import io.reactivex.Observable;
 import io.reactivex.functions.Predicate;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -42,14 +43,14 @@ public class Pong implements EntryPoint {
     @Override public void onModuleLoad() {
         css().ensureInjected();
 
-        //final HTMLButtonElement btn;
-        //Elements.body().add(btn = button("Clickame para iniciar la JUEGACIÓN :)").get());
-        //RxElemento.fromEvent(btn, EventType.click).take(1).subscribe(ev -> window.alert("¡Bienvenid@ a RxPong!"));
-
         HTMLCanvasElement canvas = Elements.canvas().css(css().board()).asElement();
+        HTMLParagraphElement debug = Elements.p().css(css().gamestatus()).asElement();
+
         canvas.width = 480;
         canvas.height = 600;
         body().add(canvas);
+        body().add(debug);
+
         CanvasRenderingContext2D context = Js.cast(canvas.getContext("2d"));
         context.fillStyle = CanvasRenderingContext2D.FillStyleUnionType.of("orange");
 
@@ -70,21 +71,12 @@ public class Pong implements EntryPoint {
                 this.x = x;
                 this.y = y;
             }
-
-            public XY x(double x) {
-                return new XY(this.x + x, y);
-            }
-
-            public XY y(double y) {
-                return new XY(x, this.y + y);
-            }
         }
 
-        // Textos
         Runnable infoAuthor = () -> {
             context.textAlign = "center";
             context.font = "14px Courier New";
-            context.fillText("RxPong GWT by Elena G, coded with coffe", canvas.width / 2, canvas.height / 2 + 24);
+            context.fillText("RxPong GWT, coded with ☕ by Elena G", canvas.width / 2, canvas.height / 2 + 24);
             context.fillText("Remagined by Ignacio Baca for learning purposes,", canvas.width / 2, canvas.height / 2 + 40);
             context.fillText("based on Breakout by Manuel Wieser", canvas.width / 2, canvas.height / 2 + 56);
 
@@ -111,9 +103,8 @@ public class Pong implements EntryPoint {
             context.fillText("press any key to play again", canvas.width / 2, canvas.height / 2 + 24);
         };
 
-        // game over + victory missing
+        Consumer<String> drawState = text -> debug.textContent = text;
 
-        // Palas
         DoubleFunction<DoubleConsumer> drawPaddle = y -> x -> {
             context.beginPath();
             context.rect(x - PADDLEWIDTH / 2, y - PADDLEHEIGHT, PADDLEWIDTH, PADDLEHEIGHT);
@@ -131,7 +122,7 @@ public class Pong implements EntryPoint {
             context.closePath();
         };
 
-        // Gestión de tiempo, tiempo en ticks, ralentizado a 20
+
         int TICKER_INTERVAL = 20;
 
         class Tick {
@@ -143,6 +134,14 @@ public class Pong implements EntryPoint {
                 this.delta = delta;
             }
         }
+
+        Observable<KeyboardEvent> space$ = RxElemento.fromEvent(document, keydown).filter(Spacebar::match);
+        Observable<Boolean> toggle$ = space$.scan(FALSE, (acc, n) -> !acc).filter(TRUE::equals);
+        Observable<Tick> ticker$ = Observable.interval(TICKER_INTERVAL, MILLISECONDS)
+                .join(toggle$, l -> empty(), r -> space$, (l, r) -> l)
+                .map(n -> new Tick(JsDate.now(), NaN))
+                .scan((previous, current) -> new Tick(current.time, (current.time - previous.time) / 1000))
+                .skip(1);
 
         class BallState {
             final XY position;
@@ -158,7 +157,6 @@ public class Pong implements EntryPoint {
             Tick tick;
             double paddle1;
             double paddle2;
-            //int score;
             BallState ball;
 
             public State copy() {
@@ -170,8 +168,14 @@ public class Pong implements EntryPoint {
                 return out;
             }
 
-            public boolean over() {
-                return 0 > ball.position.y || ball.position.y > canvas.height;
+            public boolean over() { return 0 > ball.position.y || ball.position.y > canvas.height; }
+
+            @Override public String toString() {
+                return "Game status: {" +
+                        "\n ball speed -> " + BALL_SPEED +
+                        "\n paddle position 1 -> " + (int)paddle1 +
+                        "\n paddle position 2 -> " + (int)paddle2 +
+                        "\n ball position -> " + (int)ball.position.x + ":" + (int)ball.position.y + "\n }";
             }
         }
 
@@ -180,44 +184,24 @@ public class Pong implements EntryPoint {
             out.tick = new Tick(0, 0);
             out.paddle1 = canvas.width / 2.;
             out.paddle2 = canvas.width / 2.;
-            out.ball = new BallState(new XY(canvas.width / 2, canvas.height / 2), new XY(.5, 1));
+            out.ball = new BallState(new XY(canvas.width / 2, canvas.height / 2), new XY(1.2, 1.2));
             return out;
         };
 
-        Observable<KeyboardEvent> space$ = RxElemento.fromEvent(document, keydown).filter(Spacebar::match);
-        Observable<Boolean> toggle$ = space$.scan(FALSE, (acc, n) -> !acc).filter(TRUE::equals);
-        Observable<Tick> ticker$ = Observable.interval(TICKER_INTERVAL, MILLISECONDS)
-                .join(toggle$, l -> empty(), r -> space$, (l, r) -> l)
-                .map(n -> new Tick(JsDate.now(), NaN))
-                .scan((previous, current) -> new Tick(current.time, (current.time - previous.time) / 1000))
-                .skip(1);
+        Function<Map<String, Integer>, Observable<Integer>> fromKey = (keys) -> fromEvent(document, keydown)
+                .filter(ev -> keys.containsKey(ev.code))
+                .switchMap(ev -> just(keys.get(ev.code))
+                        .concatWith(fromEvent(document, keyup)
+                                .filter(up -> ev.code.equals(up.code)).map(up -> 0).take(1)));
 
-        // Gestión de palas
-
-        Function<String, Observable<Integer>> untilUp = code -> Pong.fromEvent(document, keyup)
-                .filter(up -> Objects.equals(up.code, code)).map(up -> 0).take(1);
-
-        Observable<Integer> paddle1Directions = Pong.fromEvent(document, keydown).switchMap(down -> {
-            switch (down.code) {
-                case "KeyA":
-                    return just(-1).concatWith(untilUp.apply(down.code));
-                case "KeyD":
-                    return just(1).concatWith(untilUp.apply(down.code));
-                default:
-                    return just(0);
-            }
-        });
-
-        Observable<Integer> paddle2Directions = Pong.fromEvent(document, keydown).switchMap(down -> {
-            switch (down.code) {
-                case "KeyJ":
-                    return just(-1).concatWith(untilUp.apply(down.code));
-                case "KeyL":
-                    return just(1).concatWith(untilUp.apply(down.code));
-                default:
-                    return just(0);
-            }
-        });
+        Map<String, Integer> keys1 = new HashMap<>();
+        keys1.put("KeyA", -1);
+        keys1.put("KeyD", +1);
+        Map<String, Integer> keys2 = new HashMap<>();
+        keys2.put("KeyJ", -1);
+        keys2.put("KeyL", +1);
+        Observable<Integer> paddle1Directions = fromKey.apply(keys1);
+        Observable<Integer> paddle2Directions = fromKey.apply(keys2);
 
         Observable<Consumer<State>> paddle1Position = ticker$
                 .withLatestFrom(paddle1Directions, (ticker, direction) -> state -> {
@@ -273,6 +257,7 @@ public class Pong implements EntryPoint {
             drawPaddle1.accept(game.paddle1);
             drawPaddle2.accept(game.paddle2);
             drawBall.accept(game.ball.position);
+            drawState.accept(game.toString());
 
             if (game.over())
                 drawGameOver.accept("Game is over, " + playerToWin[0] + " wins!");
@@ -284,7 +269,6 @@ public class Pong implements EntryPoint {
             infoAuthor.run();
             infoControls.run();
             infoTitle.run();
-            // the 'backpressureLatest' assert that the 'sample' do not sent any last event after unsubscription
             return stateMachine.takeUntil(drawAll);
         });
 
@@ -293,7 +277,6 @@ public class Pong implements EntryPoint {
                 .repeat().subscribe();
     }
 
-    // Este método estático genera un Observable, un flujo con un listener y una cancelación a utilizar
     static <T extends Event> Observable<T> fromEvent(EventTarget src, EventType<T, ?> type) {
         return Observable.create(s -> {
             EventListener listener = value -> s.onNext(Js.cast(value));
@@ -302,9 +285,7 @@ public class Pong implements EntryPoint {
         });
     }
 
-    private Resources.StylePong css() {
-        return Resources.INSTANCE.style();
-    }
+    private Resources.StylePong css() { return Resources.INSTANCE.style(); }
 
     public interface Resources extends ClientBundle {
         Resources INSTANCE = GWT.create(Resources.class);
@@ -313,6 +294,7 @@ public class Pong implements EntryPoint {
 
         interface StylePong extends CssResource {
             String board();
+            String gamestatus();
         }
     }
 }

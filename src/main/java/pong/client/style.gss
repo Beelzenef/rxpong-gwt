@@ -8,12 +8,17 @@ body {
     margin: 10px;
     overflow: hidden;
     background: rebeccapurple;
-    color: hotpink;
+    color: orange;
 }
 
 .board {
     border: orange solid 1px;
     box-sizing: border-box;
-    /*width: calc(100vw - 20px);*/
-    /*height: literal("calc(1/(480/320) * calc(100vw - 20px))");*/
+}
+
+.gamestatus {
+    font-family: "courier new", courier, serif;
+    font-size: 16px;
+    height: 300px;
+    width: 480px;
 }
